@@ -1,0 +1,127 @@
+version: "3.10"
+
+networks:
+  skg_network:
+    name: skg_network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.10.10.0/24
+
+volumes:
+  skg_psql:
+    name: skg_psql
+  skg_redis:
+    name: skg_redis
+  skg_static:
+    name: skg_static
+  skg_rabbitmq:
+    name: skg_rabbitmq
+
+services:
+  skg_server:
+    build:
+      context: ../../../
+      dockerfile: backend/backend.dockerfile
+    container_name: skg_server
+    restart: always
+    depends_on:
+      - skg_psql
+      - skg_redis
+      - skg_celery
+    volumes:
+      - skg_static:/skg/backend/app/static
+    networks:
+      - skg_network
+    command:
+      - bash
+      - -c
+      - |
+        wait-for-it -s skg_psql:5433 -s skg_redis:6379 -t 50
+        mkdir -p /var/log/supervisor/
+        supervisord -c /skg/deploy/backend/supervisor.conf
+        supervisorctl restart fastapi_server
+
+  skg_psql:
+    image: postgres:15.0
+    ports:
+      - "${DOCKER_POSTGRES_MAP_PORT:-5433}:5432"
+    container_name: skg_psql
+    restart: always
+    env_file: .env
+    environment:
+      TZ: Asia/Bishkek
+    volumes:
+      - /pr:/var/lib/postgresql/data
+    networks:
+      - skg_network
+
+  skg_redis:
+    image: redis:6.2.7
+    ports:
+      - "${DOCKER_REDIS_MAP_PORT:-6379}:6379"
+    container_name: skg_redis
+    restart: always
+    environment:
+      - TZ=Asia/Bishkek
+    volumes:
+      - skg_redis:/var/lib/redis
+    networks:
+      - skg_network
+
+  skg_nginx:
+    image: nginx
+    ports:
+      - "80:80"
+    container_name: skg_nginx
+    restart: always
+    depends_on:
+      - skg_server
+    volumes:
+      - ../defaul.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../nginx.conf:/etc/nginx/nginx.conf:ro
+      - skg_static:/www/skg_server/backend/static
+    networks:
+      - skg_network
+
+  skg_rabbitmq:
+    hostname: skg_rabbitmq
+    image: rabbitmq:3.12.7
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    container_name: skg_rabbitmq
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - skg_rabbitmq:/var/lib/rabbitmq
+    networks:
+      - skg_network
+
+  skg_celery:
+    build:
+      context: ../../../
+      dockerfile: backend/celery.dockerfile
+    ports:
+      - "8555:8555"
+    container_name: skg_celery
+    restart: always
+    depends_on:
+      - skg_rabbitmq
+    networks:
+      - skg_network
+    environment:
+      - C_FORCE_ROOT=true  
+    command:
+      - bash
+      - -c
+      - |
+        wait-for-it -s skg_rabbitmq:5672 -t 300
+        mkdir -p /var/log/supervisor/
+        supervisord -c /skg/deploy/backend/supervisor.conf
+        supervisorctl restart celery_worker
+        supervisorctl restart celery_beat
+        supervisorctl restart celery_flower

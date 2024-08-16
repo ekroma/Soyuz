@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Запрос на консультацию</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #0056b3;
+        }
+        h3 {
+            color: #0056b3;
+        }
+        p {
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Запрос на консультацию</h2>
+        <p><strong>Имя:</strong> {{ name }}</p>
+        <p><strong>Email:</strong> {{ client_email }}</p>
+        <p><strong>Номер телефона:</strong> {{ phone }}</p>
+        <h3>Описание</h3>
+        <p>{{ description }}</p>
+    </div>
+</body>
+</html>

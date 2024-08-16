@@ -1,0 +1,1 @@
+from .ntf_news import News
